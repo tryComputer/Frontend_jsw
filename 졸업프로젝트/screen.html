@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>키오스크 시뮬레이션</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: url('your-green-background.jpg') center/cover no-repeat; /* 초록색 계열 이미지로 교체하세요 */
+    }
+
+    .screen {
+      width: 400px;
+      height: 700px;
+      margin: auto;
+      background-color: white;
+      position: relative;
+      box-shadow: 0 0 20px rgba(0,0,0,0.2);
+    }
+
+    header {
+      height: 50px;
+      background-color: #444;
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+    }
+
+    .category-bar {
+      display: flex;
+      justify-content: space-around;
+      background: #ddd;
+      padding: 10px 0;
+    }
+
+    .category-btn {
+      background: #fff;
+      border: 1px solid #999;
+      padding: 5px 10px;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    .category-btn.active {
+      background: #444;
+      color: white;
+    }
+
+    .page {
+      display: none;
+      padding: 10px;
+    }
+
+    .page.active {
+      display: block;
+    }
+
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .menu-card {
+      background-color: #eee;
+      text-align: center;
+      padding: 10px;
+      cursor: pointer;
+      border: 2px solid transparent;
+      border-radius: 8px;
+    }
+
+    .menu-card.selected {
+      border: 2px solid black;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      margin-top: 10px;
+      width: 100%;
+      cursor: pointer;
+    }
+
+    .modal {
+      display: none;
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 280px;
+      background: white;
+      border: 1px solid #ccc;
+      padding: 20px;
+      box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .modal.active {
+      display: block;
+    }
+
+    .modal .actions {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+
+    .cart-button {
+      background-color: #444;
+      color: white;
+      padding: 5px 15px;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    .cart-modal {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 300px;
+      background-color: white;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .cart-modal.active {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+
+<div class="screen">
+  <header>
+    <span>🎧</span><span>🏠</span><span>❓</span><span>📄</span>
+  </header>
+
+  <div class="category-bar">
+    <button class="category-btn active" onclick="selectCategory('커피')">커피</button>
+    <button class="category-btn" onclick="selectCategory('스무디')">스무디</button>
+    <button class="category-btn" onclick="selectCategory('티디저트')">티&디저트</button>
+    <button class="category-btn" onclick="selectCategory('에이드')">에이드</button>
+    <button class="category-btn" onclick="selectCategory('라떼')">라떼</button>
+  </div>
+
+  <!-- 메뉴 선택 페이지 -->
+  <div class="page active" id="menuPage">
+    <div class="menu-grid" id="menuContainer"></div>
+    <div class="pagination">
+      <button onclick="prevPage()">←</button>
+      <button onclick="nextPage()">→</button>
+    </div>
+    <button class="btn" onclick="goToPayment()">Next ➜</button>
+  </div>
+
+  <!-- 결제 선택 페이지 -->
+  <div class="page" id="paymentPage">
+    <button class="btn" onclick="confirmPayment()">카드 결제하기</button>
+    <button class="btn" onclick="showKakaoPay()">카카오페이로 결제하기</button>
+    <button class="btn" onclick="goToMenu()">뒤로 가기</button>
+    <p>합계: <span id="totalPrice">0</span>원</p>
+    <p>할인: <span id="discount">0</span>원</p>
+  
+    <div id="kakaoSection" style="display:none; margin-top: 20px; text-align: center;">
+      <p>📱 카카오페이 QR코드를 스캔하세요</p>
+      <img src="https://upload.wikimedia.org/wikipedia/commons/8/89/QR_Code_Example.svg" alt="QR 코드" width="150" />
+      <p style="margin-top: 10px;">
+        <input type="text" id="kakaoCode" value="kakaopay://payment123456" readonly style="width:80%;" />
+        <button onclick="copyKakaoCode()">복사</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- 결제 확인 모달 -->
+  <div class="modal" id="confirmModal">
+    <p>결제하시겠습니까?</p>
+    <div class="actions">
+      <button onclick="completePayment()">예</button>
+      <button onclick="closeModal()">아니요</button>
+    </div>
+  </div>
+
+  <!-- 장바구니 보기 버튼 -->
+  <button class="cart-button" onclick="showCart()">장바구니 보기</button>
+
+  <!-- 장바구니 모달 -->
+  <div class="cart-modal" id="cartModal">
+    <h3>장바구니</h3>
+    <ul id="cartList"></ul>
+    <button class="btn" onclick="goToPayment()">결제하기</button>
+    <button class="btn" onclick="closeCart()">닫기</button>
+  </div>
+</div>
+
+<script>
+  const allMenus = {
+    커피: [
+      { name: "☕ 아메리카노", price: 3500 },
+      { name: "❄️ 콜드브루", price: 4000 },
+      { name: "🥛 카페라떼", price: 4000 },
+      { name: "🍦 바닐라라떼", price: 4200 },
+      { name: "🍫 모카라떼", price: 4200 },
+      { name: "🍯 카라멜마끼아또", price: 4500 },
+      { name: "🫘 에스프레소", price: 3000 },
+      { name: "🧊 카푸치노", price: 3500 },
+      { name: "🌰 헤이즐넛라떼", price: 4200 },
+      { name: "🍮 아인슈페너", price: 4500 },
+    ],
+    스무디: [
+      { name: "🍓 딸기스무디", price: 5000 },
+      { name: "🥭 망고스무디", price: 5000 },
+      { name: "🍓🥭 딸기망고스무디", price: 5500 },
+      { name: "🍓🧁 딸기요거트스무디", price: 5500 },
+      { name: "🥭🧁 망고요거트스무디", price: 5500 },
+      { name: "🧁 요거트스무디", price: 5000 },
+      { name: "🫐 블루베리스무디", price: 5500 },
+    ],
+    티디저트: [
+      { name: "🧋 밀크티", price: 4000 },
+      { name: "🌼 자스민", price: 3500 },
+      { name: "🍃 얼그레이", price: 3500 },
+      { name: "🌿 허브티", price: 3500 },
+      { name: "🍑 아이스티(복숭아)", price: 3500 },
+      { name: "🍋 아이스티(레몬)", price: 3500 },
+      { name: "🌱 페퍼민트", price: 3500 },
+      { name: "🍋 레몬티", price: 3500 },
+      { name: "🍊 유자차", price: 3500 },
+      { name: "🌼 캐모마일", price: 3500 },
+      { name: "🍵 녹차", price: 3500 },
+      { name: "🍰 티라미슈", price: 4000 },
+      { name: "🧀 치즈케이크", price: 4000 },
+      { name: "🍫 초콜릿케이크", price: 4000 },
+      { name: "🍎 애플파이", price: 4000 },
+      { name: "🥧 휘낭시에", price: 3000 },
+      { name: "🥚 에그타르트", price: 3000 },
+      { name: "🧁 머핀", price: 3000 },
+      { name: "🍞 스콘", price: 3000 },
+      { name: "🍥 시나몬롤", price: 3000 },
+      { name: "🥯 베이글", price: 3000 },
+      { name: "🌭 핫도그", price: 3000 },
+    ],
+    에이드: [
+      { name: "🍋 레몬에이드", price: 4000 },
+      { name: "🍊 자몽에이드", price: 4000 },
+      { name: "🍇 청포도에이드", price: 4000 },
+    ],
+    라떼: [
+      { name: "🍫 초콜릿라떼", price: 4500 },
+      { name: "🍓 딸기라떼", price: 4500 },
+      { name: "🌾 오곡라떼", price: 4500 },
+      { name: "🍵 그린티라떼", price: 4500 },
+    ]
+  };
+
+  let currentCategory = '커피';
+  let currentPage = 0;
+  const itemsPerPage = 6;
+  let selectedItems = [];
+
+  const menuContainer = document.getElementById("menuContainer");
+
+  function renderMenus() {
+    const menus = allMenus[currentCategory];
+    menuContainer.innerHTML = "";
+    const start = currentPage * itemsPerPage;
+    const end = start + itemsPerPage;
+    menus.slice(start, end).forEach((menu, i) => {
+      const div = document.createElement("div");
+      div.className = "menu-card";
+      div.textContent = `${menu.name}\n${menu.price}원`;
+      div.onclick = () => toggleMenu(menu, div);
+      menuContainer.appendChild(div);
+    });
+  }
+
+  function toggleMenu(menu, element) {
+    const index = selectedItems.findIndex(item => item.name === menu.name);
+    if (index > -1) {
+      selectedItems.splice(index, 1);
+      element.classList.remove("selected");
+    } else {
+      selectedItems.push(menu);
+      element.classList.add("selected");
+    }
+  }
+
+  function selectCategory(cat) {
+    currentCategory = cat;
+    currentPage = 0;
+    document.querySelectorAll(".category-btn").forEach(btn => btn.classList.remove("active"));
+    event.target.classList.add("active");
+    renderMenus();
+  }
+
+  function nextPage() {
+    const menus = allMenus[currentCategory];
+    if ((currentPage + 1) * itemsPerPage < menus.length) {
+      currentPage++;
+      renderMenus();
+    }
+  }
+
+  function prevPage() {
+    if (currentPage > 0) {
+      currentPage--;
+      renderMenus();
+    }
+  }
+
+  function goToPayment() {
+    document.getElementById("menuPage").classList.remove("active");
+    document.getElementById("paymentPage").classList.add("active");
+
+    const total = selectedItems.reduce((sum, item) => sum + item.price, 0);
+    document.getElementById("totalPrice").textContent = total;
+    document.getElementById("discount").textContent = total >= 15000 ? 1000 : 0;
+  }
+
+  function goToMenu() {
+    document.getElementById("menuPage").classList.add("active");
+    document.getElementById("paymentPage").classList.remove("active");
+  }
+
+  function confirmPayment() {
+    document.getElementById("confirmModal").classList.add("active");
+  }
+
+  function closeModal() {
+    document.getElementById("confirmModal").classList.remove("active");
+  }
+
+  function completePayment() {
+    alert("결제가 완료되었습니다.");
+    location.reload();
+  }
+
+  function showKakaoPay() {
+    document.getElementById("kakaoSection").style.display = "block";
+  }
+
+  function copyKakaoCode() {
+    const input = document.getElementById("kakaoCode");
+    input.select();
+    input.setSelectionRange(0, 99999); // 모바일 호환
+    document.execCommand("copy");
+    alert("결제 링크가 복사되었습니다!");
+  }
+
+  function showCart() {
+    const cartModal = document.getElementById("cartModal");
+    const cartList = document.getElementById("cartList");
+    cartList.innerHTML = ""; // 기존 장바구니 목록 초기화
+
+    selectedItems.forEach(item => {
+      const li = document.createElement("li");
+      li.textContent = `${item.name} - ${item.price}원`;
+      cartList.appendChild(li);
+    });
+
+    cartModal.classList.add("active");
+  }
+
+  function closeCart() {
+    document.getElementById("cartModal").classList.remove("active");
+  }
+
+  renderMenus();
+</script>
+
+</body>
+</html>
